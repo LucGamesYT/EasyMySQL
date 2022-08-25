@@ -51,6 +51,9 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
     private List<Object> findAll( String tableName, Class<?> clazz ) {
         String query = "SELECT * FROM " + tableName;
         List<Object> objectList = new ArrayList<>();
+        if ( !this.tableExists( tableName ) ) {
+            return objectList;
+        }
         try ( PreparedStatement statement = this.connection.prepareStatement( query ) ) {
             ResultSet resultSet = statement.executeQuery();
             while ( resultSet.next() ) {
@@ -71,6 +74,11 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
     }
 
     private List<Object> findAllBy( String tableName, String methodName, Object[] args, Class<?> clazz ) {
+        List<Object> objectList = new ArrayList<>();
+        if ( !this.tableExists( tableName ) ) {
+            return objectList;
+        }
+
         List<String> methodeWords = new ArrayList<>( Arrays.asList( methodName.substring( 9 ).split( "(?=\\p{Upper})" ) ) );
         methodeWords.removeIf( text -> text.equalsIgnoreCase( "and" ) );
 
@@ -82,7 +90,6 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
         }
         stringBuilder.setLength( stringBuilder.length() - 4 );
         String query = "SELECT * FROM " + tableName + " WHERE" + stringBuilder;
-        List<Object> objectList = new ArrayList<>();
         try ( PreparedStatement statement = this.connection.prepareStatement( query ) ) {
             ResultSet resultSet = statement.executeQuery();
             while ( resultSet.next() ) {
@@ -102,6 +109,9 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
     }
 
     private Optional<?> findOneBy( String tableName, String methodName, Object[] args, Class<?> clazz ) {
+        if ( !this.tableExists( tableName ) ) {
+            return Optional.empty();
+        }
         List<String> methodeWords = new ArrayList<>( Arrays.asList( methodName.substring( 9 ).split( "(?=\\p{Upper})" ) ) );
         methodeWords.removeIf( text -> text.equalsIgnoreCase( "and" ) );
         StringBuilder stringBuilder = new StringBuilder();
@@ -271,6 +281,17 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
             deleteStatement.executeUpdate();
         } catch ( SQLException e ) {
             e.printStackTrace();
+        }
+    }
+
+    private boolean tableExists( String tableName ) {
+        try ( PreparedStatement statement = this.connection.prepareStatement( "SHOW TABLES LIKE '" + tableName + "'" ) ) {
+            ResultSet resultSet = statement.executeQuery();
+            boolean exists = resultSet.next();
+            resultSet.close();
+            return exists;
+        } catch ( SQLException e ) {
+            return false;
         }
     }
 }
