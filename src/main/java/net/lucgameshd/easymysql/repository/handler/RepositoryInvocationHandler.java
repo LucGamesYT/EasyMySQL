@@ -6,10 +6,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import net.lucgameshd.easymysql.annotation.Column;
 import net.lucgameshd.easymysql.annotation.Id;
 import net.lucgameshd.easymysql.annotation.Table;
-import net.lucgameshd.easymysql.serialization.LocalDateDeserializer;
-import net.lucgameshd.easymysql.serialization.LocalDateSerializer;
-import net.lucgameshd.easymysql.serialization.LocalDateTimeDeserializer;
-import net.lucgameshd.easymysql.serialization.LocalDateTimeSerializer;
+import net.lucgameshd.easymysql.serialization.*;
 import org.json.JSONObject;
 
 import java.lang.reflect.Field;
@@ -21,10 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * @author LucGamesYT
@@ -35,20 +29,26 @@ public class RepositoryInvocationHandler implements InvocationHandler {
     private final Class<?> repository;
     private final Connection connection;
 
-    private final SimpleModule localDateTimeModul;
-    private final SimpleModule localDateModul;
+    private final ObjectMapper objectMapper;
 
     public RepositoryInvocationHandler( Class<?> repository, Connection connection ) {
         this.repository = repository;
         this.connection = connection;
 
-        this.localDateTimeModul = new SimpleModule()
+        SimpleModule localDateTimeModul = new SimpleModule()
                 .addSerializer( LocalDateTime.class, new LocalDateTimeSerializer() )
                 .addDeserializer( LocalDateTime.class, new LocalDateTimeDeserializer() );
 
-        this.localDateModul = new SimpleModule()
+        SimpleModule localDateModul = new SimpleModule()
                 .addSerializer( LocalDate.class, new LocalDateSerializer() )
                 .addDeserializer( LocalDate.class, new LocalDateDeserializer() );
+
+        SimpleModule uuidModul = new SimpleModule()
+                .addSerializer( UUID.class, new UUIDSerializer() )
+                .addDeserializer( UUID.class, new UUIDDeserializer() );
+
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModules( localDateTimeModul, localDateModul, uuidModul );
     }
 
     @Override
@@ -74,6 +74,29 @@ public class RepositoryInvocationHandler implements InvocationHandler {
         return "N/A";
     }
 
+    private String getType( Class<?> clazz, Column column ) {
+        if ( clazz.equals( String.class ) || clazz.equals( UUID.class )) {
+            if ( column != null ) {
+                return "VARCHAR(" + column.length() + ")";
+            } else {
+                return "VARCHAR(255)";
+            }
+        } else if ( clazz.equals( Integer.class ) || clazz.equals( int.class ) ) {
+            return "INT";
+        } else if ( clazz.equals( Long.class ) || clazz.equals( long.class ) ) {
+            return "BIGINT";
+        } else if ( clazz.equals( Float.class ) || clazz.equals( float.class ) ) {
+            return "FLOAT";
+        } else if ( clazz.equals( Double.class ) || clazz.equals( double.class ) ) {
+            return "DOUBLE";
+        } else if ( clazz.equals( Boolean.class ) || clazz.equals( boolean.class ) ) {
+            return "TINYINT";
+        } else if ( clazz.equals( LocalDateTime.class ) ) {
+            return "TIMESTAMP";
+        }
+        return "LONGTEXT";
+    }
+
     private List<Object> findAll( String tableName, Class<?> clazz ) {
         String query = "SELECT * FROM " + tableName;
         List<Object> objectList = new ArrayList<>();
@@ -88,9 +111,7 @@ public class RepositoryInvocationHandler implements InvocationHandler {
                 for ( int i = 0; i < totalRows; i++ ) {
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
-                ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
-                objectList.add( objectMapper.readValue( obj.toString(), clazz ) );
+                objectList.add( this.objectMapper.readValue( obj.toString(), clazz ) );
             }
             resultSet.close();
             return objectList;
@@ -125,9 +146,7 @@ public class RepositoryInvocationHandler implements InvocationHandler {
                 for ( int i = 0; i < totalRows; i++ ) {
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
-                ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
-                objectList.add( objectMapper.readValue( obj.toString(), clazz ) );
+                objectList.add( this.objectMapper.readValue( obj.toString(), clazz ) );
             }
             resultSet.close();
         } catch ( SQLException | JsonProcessingException e ) {
@@ -159,11 +178,8 @@ public class RepositoryInvocationHandler implements InvocationHandler {
                 for ( int i = 0; i < totalRows; i++ ) {
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
-
-                ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
                 resultSet.close();
-                return Optional.ofNullable( objectMapper.readValue( obj.toString(), clazz ) );
+                return Optional.ofNullable( this.objectMapper.readValue( obj.toString(), clazz ) );
             } else {
                 resultSet.close();
                 return Optional.empty();
@@ -172,29 +188,6 @@ public class RepositoryInvocationHandler implements InvocationHandler {
             e.printStackTrace();
         }
         return Optional.empty();
-    }
-
-    private String getType( Class<?> clazz, Column column ) {
-        if ( clazz.equals( String.class ) ) {
-            if ( column != null ) {
-                return "VARCHAR(" + column.length() + ")";
-            } else {
-                return "VARCHAR(255)";
-            }
-        } else if ( clazz.equals( Integer.class ) || clazz.equals( int.class ) ) {
-            return "INT";
-        } else if ( clazz.equals( Long.class ) || clazz.equals( long.class ) ) {
-            return "BIGINT";
-        } else if ( clazz.equals( Float.class ) || clazz.equals( float.class ) ) {
-            return "FLOAT";
-        } else if ( clazz.equals( Double.class ) || clazz.equals( double.class ) ) {
-            return "DOUBLE";
-        } else if ( clazz.equals( Boolean.class ) || clazz.equals( boolean.class ) ) {
-            return "TINYINT";
-        } else if ( clazz.equals( LocalDateTime.class ) ) {
-            return "TIMESTAMP";
-        }
-        return "LONGTEXT";
     }
 
     private void save( String tableName, Object[] args ) throws Exception {
