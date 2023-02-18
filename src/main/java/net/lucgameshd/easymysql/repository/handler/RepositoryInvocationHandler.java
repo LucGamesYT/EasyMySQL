@@ -2,9 +2,14 @@ package net.lucgameshd.easymysql.repository.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import net.lucgameshd.easymysql.annotation.Column;
 import net.lucgameshd.easymysql.annotation.Id;
 import net.lucgameshd.easymysql.annotation.Table;
+import net.lucgameshd.easymysql.serialization.LocalDateDeserializer;
+import net.lucgameshd.easymysql.serialization.LocalDateSerializer;
+import net.lucgameshd.easymysql.serialization.LocalDateTimeDeserializer;
+import net.lucgameshd.easymysql.serialization.LocalDateTimeSerializer;
 import org.json.JSONObject;
 
 import java.lang.reflect.Field;
@@ -14,6 +19,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,7 +30,26 @@ import java.util.Optional;
  * @author LucGamesYT
  * @version 1.0
  */
-public record RepositoryInvocationHandler(Class<?> repository, Connection connection) implements InvocationHandler {
+public class RepositoryInvocationHandler implements InvocationHandler {
+
+    private final Class<?> repository;
+    private final Connection connection;
+
+    private final SimpleModule localDateTimeModul;
+    private final SimpleModule localDateModul;
+
+    public RepositoryInvocationHandler( Class<?> repository, Connection connection ) {
+        this.repository = repository;
+        this.connection = connection;
+
+        this.localDateTimeModul = new SimpleModule()
+                .addSerializer( LocalDateTime.class, new LocalDateTimeSerializer() )
+                .addDeserializer( LocalDateTime.class, new LocalDateTimeDeserializer() );
+
+        this.localDateModul = new SimpleModule()
+                .addSerializer( LocalDate.class, new LocalDateSerializer() )
+                .addDeserializer( LocalDate.class, new LocalDateDeserializer() );
+    }
 
     @Override
     public Object invoke( Object proxy, Method method, Object[] args ) throws Throwable {
@@ -63,6 +89,7 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
                 ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
                 objectList.add( objectMapper.readValue( obj.toString(), clazz ) );
             }
             resultSet.close();
@@ -99,6 +126,7 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
                 ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
                 objectList.add( objectMapper.readValue( obj.toString(), clazz ) );
             }
             resultSet.close();
@@ -131,7 +159,9 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
                 for ( int i = 0; i < totalRows; i++ ) {
                     obj.put( resultSet.getMetaData().getColumnLabel( i + 1 ), resultSet.getObject( i + 1 ) );
                 }
+
                 ObjectMapper objectMapper = new ObjectMapper();
+                objectMapper.registerModules( this.localDateTimeModul, this.localDateModul );
                 resultSet.close();
                 return Optional.ofNullable( objectMapper.readValue( obj.toString(), clazz ) );
             } else {
@@ -151,16 +181,18 @@ public record RepositoryInvocationHandler(Class<?> repository, Connection connec
             } else {
                 return "VARCHAR(255)";
             }
-        } else if ( clazz.equals( int.class ) || clazz.equals( Integer.class ) ) {
+        } else if ( clazz.equals( Integer.class ) || clazz.equals( int.class ) ) {
             return "INT";
-        } else if ( clazz.equals( Long.class ) ) {
+        } else if ( clazz.equals( Long.class ) || clazz.equals( long.class ) ) {
             return "BIGINT";
-        } else if ( clazz.equals( Float.class ) ) {
+        } else if ( clazz.equals( Float.class ) || clazz.equals( float.class ) ) {
             return "FLOAT";
-        } else if ( clazz.equals( Double.class ) ) {
+        } else if ( clazz.equals( Double.class ) || clazz.equals( double.class ) ) {
             return "DOUBLE";
         } else if ( clazz.equals( Boolean.class ) || clazz.equals( boolean.class ) ) {
             return "TINYINT";
+        } else if ( clazz.equals( LocalDateTime.class ) ) {
+            return "TIMESTAMP";
         }
         return "LONGTEXT";
     }
