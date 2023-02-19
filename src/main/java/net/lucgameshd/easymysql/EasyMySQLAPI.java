@@ -16,12 +16,12 @@ public class EasyMySQLAPI {
 
     private static Connection connection = null;
 
-    public static SQLRepository<?> create( Class<?> clazz ) {
-        return (SQLRepository<?>) Proxy.newProxyInstance( clazz.getClassLoader(), new Class[]{ clazz }, new RepositoryInvocationHandler( clazz, connection ) );
+    public static <T extends SQLRepository<?>> T create( Class<?> clazz ) {
+        return (T) Proxy.newProxyInstance( clazz.getClassLoader(), new Class[]{ clazz }, new RepositoryInvocationHandler( clazz, connection ) );
     }
 
-    public static SQLRepository<?> create( Class<?> clazz, Connection connection ) {
-        return (SQLRepository<?>) Proxy.newProxyInstance( clazz.getClassLoader(), new Class[]{ clazz }, new RepositoryInvocationHandler( clazz, connection ) );
+    public static <T extends SQLRepository<?>> T create( Class<?> clazz, Connection connection ) {
+        return (T) Proxy.newProxyInstance( clazz.getClassLoader(), new Class[]{ clazz }, new RepositoryInvocationHandler( clazz, connection ) );
     }
 
     public static void createConnection( String url, String user, String password ) throws SQLException {
