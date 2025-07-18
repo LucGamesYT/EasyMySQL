@@ -10,6 +10,7 @@ import org.reflections.Reflections
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.SQLException
 import kotlin.reflect.KClass
 
 object EasyMySQLAPI {
