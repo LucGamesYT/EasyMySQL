@@ -15,6 +15,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok:1.18.22")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.13.2.2")
     implementation("com.fasterxml.jackson.core:jackson-core:2.13.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.2")
     implementation("org.json:json:20220320")
     implementation(kotlin("stdlib-jdk8"))
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.0.21")
